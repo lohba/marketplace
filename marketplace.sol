@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-abstract contract NFT is ERC721URIStorage {
+contract NFT is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
     address contractAddress;
@@ -33,6 +33,12 @@ contract NFTMarket is ReentrancyGuard {
     using Counters for Counters.Counter;
     Counters.Counter private _itemIds;
     Counters.Counter private _itemSold;
+    address payable owner;
+    uint256 listingPrice = 10 ether;
+
+    constructor() {
+        owner = payable(msg.sender);
+    }
 
     struct MarketItem {
         uint256 itemId;
@@ -60,6 +66,10 @@ contract NFTMarket is ReentrancyGuard {
         uint256 price
     ) public payable nonReentrant {
         require(price > 0, "Price mut be at least 1 wei");
+        require(
+            msg.value == listingPrice,
+            "Price must be equal to listing price"
+        );
         _itemIds.increment();
         uint256 itemId = _itemIds.current();
 
@@ -101,6 +111,7 @@ contract NFTMarket is ReentrancyGuard {
         IERC721(nftContract).transferFrom(address(this), msg.sender, tokenId);
         idToMarketItem[itemId].owner = payable(msg.sender);
         _itemSold.increment();
+        payable(owner).transfer(listingPrice);
     }
 
     function fetchMarketItems() public view returns (MarketItem[] memory) {
@@ -132,5 +143,14 @@ contract NFTMarket is ReentrancyGuard {
         }
 
         MarketItem[] memory items = new MarketItem[](itemCount);
+        for (uint256 i = 0; i < totalItemCount; i++) {
+            if (idToMarketItem[i + 1].owner == msg.sender) {
+                uint256 currentId = idToMarketItem[i + 1].itemId;
+                MarketItem storage currentItem = idToMarketItem[currentId];
+                items[currentIndex] = currentItem;
+                currentIndex += 1;
+            }
+        }
+        return items;
     }
 }
